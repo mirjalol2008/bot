@@ -1,4 +1,4 @@
-app = "BOT"  # O'zgartiring o'zingizning Fly.io app nomingizga
+app = "my-cool-bot"  # O'zgartiring o'zingizning Fly.io app nomingizga
 
 [env]
 API_TOKEN = "7863211646:AAEZsu6domxM1yHxzDpvnis8a9RKGmBSw9Y"  # Bot tokeningizni shu yerga yozing
