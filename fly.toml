@@ -1,0 +1,14 @@
+app = "BOT"  # O'zgartiring o'zingizning Fly.io app nomingizga
+
+[env]
+API_TOKEN = "7863211646:AAEZsu6domxM1yHxzDpvnis8a9RKGmBSw9Y"  # Bot tokeningizni shu yerga yozing
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 80
+
+  [[services.ports]]
+    port = 443
