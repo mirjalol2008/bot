@@ -6,16 +6,18 @@ import subprocess
 
 from aiogram import Bot, Dispatcher, F, Router, types
 from aiogram.enums import ParseMode
-from aiogram.types import (
-    InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile
-)
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile
 from aiogram.filters import Command
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 
 API_TOKEN = ("7863211646:AAEZsu6domxM1yHxzDpvnis8a9RKGmBSw9Y")
 ADMIN_ID = 5873723609
-FILES_DIR = "/uploaded_bots"
+
+# ✅ Fly.io doimiy kataloglar
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FILES_DIR = os.path.join(BASE_DIR, "uploaded_bots")
+DB_PATH = os.path.join(BASE_DIR, "users.db")
 
 logging.basicConfig(level=logging.INFO)
 os.makedirs(FILES_DIR, exist_ok=True)
@@ -26,7 +28,7 @@ router = Router()
 dp.include_router(router)
 
 # --- DB connection ---
-conn = sqlite3.connect("/users.db", check_same_thread=False)
+conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 cursor = conn.cursor()
 
 def check_and_add_banned_column():
@@ -35,7 +37,7 @@ def check_and_add_banned_column():
     if "banned" not in columns:
         cursor.execute("ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0")
         conn.commit()
-        logging.info("Added 'banned' column to 'users' table.")
+        logging.info("✅ 'banned' ustuni qo‘shildi.")
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS users (
