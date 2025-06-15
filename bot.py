@@ -4,22 +4,26 @@ import os
 import sqlite3
 import subprocess
 
-from aiogram import Bot, Dispatcher, F, types
+from aiogram import Bot, Dispatcher, F, Router, types
 from aiogram.enums import ParseMode
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile
+from aiogram.types import (
+    InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile
+)
 from aiogram.filters import Command
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 
 API_TOKEN = os.getenv("API_TOKEN")
 ADMIN_ID = 5873723609
-FILES_DIR = "/tmp/uploaded_bots"  # Fly.io uchun vaqtinchalik katalog
+FILES_DIR = "/tmp/uploaded_bots"
 
 logging.basicConfig(level=logging.INFO)
 os.makedirs(FILES_DIR, exist_ok=True)
 
 bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher(storage=MemoryStorage())
+router = Router()
+dp.include_router(router)
 
 # --- DB connection ---
 conn = sqlite3.connect("/tmp/users.db", check_same_thread=False)
@@ -40,9 +44,9 @@ CREATE TABLE IF NOT EXISTS users (
 )
 """)
 conn.commit()
-
 check_and_add_banned_column()
 
+# --- Helper functions ---
 def is_user_approved(user_id: int) -> bool:
     cursor.execute("SELECT approved FROM users WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
@@ -71,13 +75,12 @@ def get_banned_users():
     cursor.execute("SELECT user_id FROM users WHERE banned = 1")
     return [row[0] for row in cursor.fetchall()]
 
-@dp.message(Command("start"))
+# --- Handlers ---
+@router.message(Command("start"))
 async def cmd_start(message: types.Message):
     user_id = message.from_user.id
-
     if is_user_banned(user_id):
         return await message.answer("🚫 Siz botdan foydalanishdan banlangansiz.")
-
     if is_user_approved(user_id):
         return await message.answer("✅ Siz tasdiqlangansiz.\nIltimos, <b>.py</b> fayl yuboring.")
 
@@ -90,41 +93,37 @@ async def cmd_start(message: types.Message):
         f"❓ Tasdiqlaysizmi yoki ban qilasizmi?"
     )
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"approve:{user_id}"),
-                InlineKeyboardButton(text="❌ Banlash", callback_data=f"ban:{user_id}")
-            ]
-        ]
+        inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"approve:{user_id}"),
+            InlineKeyboardButton(text="❌ Banlash", callback_data=f"ban:{user_id}")
+        ]]
     )
     await bot.send_message(chat_id=ADMIN_ID, text=text, reply_markup=keyboard)
     await message.answer("⏳ So‘rovingiz yuborildi. Admin tasdiqlamaguncha kuting.")
 
-@dp.callback_query(F.data.startswith("approve:"))
+@router.callback_query(F.data.startswith("approve:"))
 async def approve_callback(callback: types.CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
         return await callback.answer("⛔ Sizda ruxsat yo‘q.", show_alert=True)
 
     user_id = int(callback.data.split(":")[1])
     approve_user(user_id)
-
     await bot.send_message(chat_id=user_id, text="✅ Siz tasdiqlandingiz! Endi .py fayl yuboring.")
     await callback.message.edit_text("✅ Foydalanuvchi tasdiqlandi.")
     await callback.answer()
 
-@dp.callback_query(F.data.startswith("ban:"))
+@router.callback_query(F.data.startswith("ban:"))
 async def ban_callback(callback: types.CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
         return await callback.answer("⛔ Sizda ruxsat yo‘q.", show_alert=True)
 
     user_id = int(callback.data.split(":")[1])
     ban_user(user_id)
-
     await bot.send_message(chat_id=user_id, text="🚫 Siz botdan foydalanishdan banlangansiz.")
     await callback.message.edit_text("❌ Foydalanuvchi ban qilindi.")
     await callback.answer()
 
-@dp.message(Command("unban"))
+@router.message(Command("unban"))
 async def unban_user_command(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return await message.answer("⛔ Sizda ruxsat yo‘q.")
@@ -137,23 +136,20 @@ async def unban_user_command(message: types.Message):
     unban_user(user_id)
     await message.answer(f"✅ Foydalanuvchi <code>{user_id}</code> unban qilindi.")
 
-@dp.message(Command("banned"))
+@router.message(Command("banned"))
 async def banned_list(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return await message.answer("⛔ Sizda ruxsat yo‘q.")
-
     banned_users = get_banned_users()
     if not banned_users:
         return await message.answer("✅ Banlangan foydalanuvchilar yo‘q.")
-
     text = "<b>🚫 Banlangan foydalanuvchilar:</b>\n"
     text += "\n".join([f"• <code>{uid}</code>" for uid in banned_users])
     await message.answer(text)
 
-@dp.message(F.document)
+@router.message(F.document)
 async def handle_file(message: types.Message):
     user_id = message.from_user.id
-
     if is_user_banned(user_id):
         return await message.answer("🚫 Siz banlangansiz.")
     if not is_user_approved(user_id):
@@ -179,10 +175,9 @@ async def handle_file(message: types.Message):
 
     await message.answer(f"✅ Fayl saqlandi: <code>{document.file_name}</code>\n🚀 Fon rejimda ishga tushdi.")
 
-@dp.message(Command("mybots"))
+@router.message(Command("mybots"))
 async def my_bots(message: types.Message):
     user_id = message.from_user.id
-
     if is_user_banned(user_id):
         return await message.answer("🚫 Siz banlangansiz.")
     if not is_user_approved(user_id):
@@ -208,7 +203,7 @@ async def my_bots(message: types.Message):
         markup = InlineKeyboardMarkup(inline_keyboard=[buttons])
         await message.answer(f"🤖 <code>{filename}</code>", reply_markup=markup)
 
-@dp.callback_query(F.data.startswith("log:"))
+@router.callback_query(F.data.startswith("log:"))
 async def log_callback(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     filename = callback.data.split(":")[1]
@@ -220,7 +215,7 @@ async def log_callback(callback: types.CallbackQuery):
     await callback.message.answer_document(FSInputFile(file_path), caption="📥 Log fayli")
     await callback.answer()
 
-@dp.callback_query(F.data.startswith("stop:"))
+@router.callback_query(F.data.startswith("stop:"))
 async def stop_callback(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     filename = callback.data.split(":")[1]
@@ -238,16 +233,15 @@ async def stop_callback(callback: types.CallbackQuery):
     await callback.answer("🛑 Bot to‘xtatildi.")
     await callback.message.edit_text(f"🔴 <code>{filename}</code> to‘xtatildi.")
 
-@dp.message()
+@router.message()
 async def fallback_message(message: types.Message):
     user_id = message.from_user.id
-
     if is_user_banned(user_id):
         return await message.answer("🚫 Siz banlangansiz.")
     if not is_user_approved(user_id):
         return await message.answer("⏳ Siz hali tasdiqlanmadingiz.")
-
     await message.answer("✅ Siz tasdiqlangansiz.\nIltimos, <b>.py</b> fayl yuboring.")
 
+# --- Polling ---
 if __name__ == "__main__":
     asyncio.run(dp.start_polling(bot))
