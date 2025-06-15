@@ -15,7 +15,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 API_TOKEN = ("7863211646:AAEZsu6domxM1yHxzDpvnis8a9RKGmBSw9Y")
 ADMIN_ID = 5873723609
-FILES_DIR = "/tmp/uploaded_bots"
+FILES_DIR = "/uploaded_bots"
 
 logging.basicConfig(level=logging.INFO)
 os.makedirs(FILES_DIR, exist_ok=True)
@@ -26,7 +26,7 @@ router = Router()
 dp.include_router(router)
 
 # --- DB connection ---
-conn = sqlite3.connect("/tmp/users.db", check_same_thread=False)
+conn = sqlite3.connect("/users.db", check_same_thread=False)
 cursor = conn.cursor()
 
 def check_and_add_banned_column():
